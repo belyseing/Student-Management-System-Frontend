@@ -78,34 +78,6 @@ const Sidebar: React.FC = () => {
           })}
         </ul>
       </nav>
-
-      {/* {user && (
-        <div className="absolute bottom-6 left-4 right-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                {user.profilePicture ? (
-                  <img
-                    src={user.profilePicture}
-                    alt={user.fullName}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <UserIcon className="w-6 h-6 text-gray-600" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {user.fullName}
-                </p>
-                <p className="text-xs text-gray-500 capitalize">
-                  {user.role}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )} */}
     </div>
   );
 };

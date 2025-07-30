@@ -12,7 +12,6 @@ import {
   PencilIcon,
   TrashIcon,
   MagnifyingGlassIcon,
-  FunnelIcon,
   AcademicCapIcon,
   UserPlusIcon
 } from '@heroicons/react/24/outline';
@@ -168,7 +167,7 @@ const StudentsIndexPage: React.FC = () => {
     <ProtectedRoute requiredRole="admin">
       <Layout>
         <div className="space-y-6">
-          {/* Header */}
+  
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Students</h1>
@@ -183,7 +182,7 @@ const StudentsIndexPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Stats Cards */}
+      
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
               <div className="flex items-center justify-between">
@@ -238,10 +237,10 @@ const StudentsIndexPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters and Search */}
+   
           <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
             <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search */}
+        
               <div className="flex-1 text-black">
                 <div className="relative">
                   <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
@@ -255,7 +254,7 @@ const StudentsIndexPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Course Filter */}
+            
               <div className="w-full lg:w-48 text-black">
                 <select
                   value={filterCourse}
@@ -269,7 +268,7 @@ const StudentsIndexPage: React.FC = () => {
                 </select>
               </div>
 
-              {/* Status Filter */}
+       
               <div className="w-full lg:w-48 text-black">
                 <select
                   value={filterStatus}
@@ -285,7 +284,7 @@ const StudentsIndexPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Students Table */}
+       
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -370,7 +369,7 @@ const StudentsIndexPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Add Student Modal */}
+ 
         {showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">

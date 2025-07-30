@@ -28,7 +28,7 @@ const DashboardPage: React.FC = () => {
       <ProtectedRoute>
         <Layout>
           <div className="space-y-6 pb-20"> 
-            {/* Welcome Section */}
+           
             <div className="bg-gradient-to-r from-green-800 to-green-700 rounded-lg p-6 text-white">
               <h1 className="text-2xl font-bold mb-2">
                 Welcome back, {user?.fullName.split(' ')[0]}!
@@ -38,7 +38,7 @@ const DashboardPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Student Stats */}
+          
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                 <div className="flex items-center justify-between">
@@ -89,7 +89,7 @@ const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Current Courses  */}
+           
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Current Courses</h3>
@@ -165,7 +165,7 @@ const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Actions */}
+            
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 mb-10"> 
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

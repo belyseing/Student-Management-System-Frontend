@@ -108,7 +108,7 @@ const ProfilePage: React.FC = () => {
     <ProtectedRoute>
       <Layout>
         <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-          {/* Header */}
+         
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div>
               <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Profile</h1>
@@ -125,7 +125,7 @@ const ProfilePage: React.FC = () => {
             )}
           </div>
 
-          {/* Alerts */}
+          
           <div className="mb-4 sm:mb-6">
             {success && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-2 sm:p-4 flex items-center space-x-2">
@@ -140,10 +140,7 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Main content grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
-            {/* Profile Picture Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">  
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 h-full">
                 <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-4">Profile Picture</h3>
@@ -175,7 +172,7 @@ const ProfilePage: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Role Badge */}
+               
                 <div className="mt-3 sm:mt-6 text-center">
                   <span className={`inline-flex items-center px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium capitalize ${
                     user?.role === 'admin' 
@@ -186,7 +183,7 @@ const ProfilePage: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Student Status */}
+               
                 {user?.role === 'student' && user?.status && (
                   <div className="mt-1 sm:mt-3 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${getStatusColor(user.status)}`}>
@@ -197,7 +194,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Personal Information */}
+           
             <div className="lg:col-span-2">
               <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 h-full">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-6 gap-2 sm:gap-4">
@@ -223,7 +220,7 @@ const ProfilePage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
-                  {/* Full Name */}
+                 
                   <div>
                     <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                       Full Name
@@ -234,14 +231,14 @@ const ProfilePage: React.FC = () => {
                         name="fullName"
                         value={formData.fullName}
                         onChange={handleInputChange}
-                        className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-2 sm:px-3 text-gray-800 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     ) : (
                       <p className="text-xs sm:text-sm text-gray-900 py-1 sm:py-2">{user?.fullName}</p>
                     )}
                   </div>
 
-                  {/* Email */}
+                 
                   <div>
                     <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                       Email Address
@@ -252,14 +249,14 @@ const ProfilePage: React.FC = () => {
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
-                        className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-2 sm:px-3 py-1  text-gray-800 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     ) : (
                       <p className="text-xs sm:text-sm text-gray-900 py-1 sm:py-2">{user?.email}</p>
                     )}
                   </div>
 
-                  {/* Phone */}
+                
                   <div>
                     <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                       Phone Number
@@ -270,7 +267,7 @@ const ProfilePage: React.FC = () => {
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-2 sm:px-3 text-gray-800  py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Enter phone number"
                       />
                     ) : (
@@ -278,7 +275,7 @@ const ProfilePage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Course of Study (Students only) */}
+                
                   {user?.role === 'student' && (
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -290,7 +287,7 @@ const ProfilePage: React.FC = () => {
                           name="courseOfStudy"
                           value={formData.courseOfStudy}
                           onChange={handleInputChange}
-                          className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-2 sm:px-3 text-gray-800 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           placeholder="e.g., Computer Science"
                         />
                       ) : (
@@ -299,7 +296,7 @@ const ProfilePage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Enrollment Year (Students only) */}
+                
                   {user?.role === 'student' && (
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
@@ -310,7 +307,7 @@ const ProfilePage: React.FC = () => {
                           name="enrollmentYear"
                           value={formData.enrollmentYear}
                           onChange={handleInputChange}
-                          className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-2 sm:px-3  text-gray-800 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                           {yearOptions.map(year => (
                             <option key={year} value={year}>{year}</option>
@@ -326,7 +323,7 @@ const ProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Account Information - Now properly positioned */}
+         
           <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200">
             <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-4">Account Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
