@@ -10,7 +10,6 @@ import {
   CheckIcon,
   XMarkIcon,
   CameraIcon,
-  ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 
 

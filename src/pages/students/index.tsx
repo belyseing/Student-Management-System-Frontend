@@ -54,12 +54,11 @@ const StudentsIndexPage: React.FC = () => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   
-  // --- MODIFIED ---
-  // Added password to the initial state for the new student form
+
   const [newStudent, setNewStudent] = useState({
     fullName: '',
     email: '',
-    password: '', // Added password field
+    password: '', 
     phone: '',
     course: '',
     enrollmentYear: new Date().getFullYear(),
@@ -127,7 +126,7 @@ const StudentsIndexPage: React.FC = () => {
     fetchStudents();
   }, [apiBaseUrl]);
 
-  // Memoized filtered students
+
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
       const searchLower = searchTerm.toLowerCase();

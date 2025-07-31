@@ -96,7 +96,7 @@ const HomePage = () => {
                 <AcademicCapIcon className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-900 bg-clip-text text-transparent">SMS</h1>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-900 bg-clip-text text-transparent">TechUni</h1>
                 <p className="text-sm text-gray-600 font-medium">Student Management System</p>
               </div>
             </div>
@@ -116,7 +116,7 @@ const HomePage = () => {
             
             
             <div className="bg-gray-50 p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto border border-gray-200">
-              <h2 className="text-3xl font-bold mb-6 text-gray-800">Sign in to SMS</h2>
+              <h2 className="text-3xl font-bold mb-6 text-gray-800">Sign in to TechUni</h2>
 
               {error && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm mb-4 border border-red-200">
@@ -188,7 +188,7 @@ const HomePage = () => {
             </div>
 
            
-            <div className="relative h-full min-h-[700px] lg:min-h-[800px]">
+            <div className="relative h-full min-h-[700px] lg:min-h-[00px]">
               <div className="absolute inset-0 bg-gradient-to-br from-green-100 via-green-50 to-gray-100 rounded-3xl blur-3xl"></div>
               <div className="relative w-full h-full bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200">
                 <div className="bg-gradient-to-r from-green-800 to-green-700 p-6 text-white">
@@ -209,7 +209,7 @@ const HomePage = () => {
                       <div className="text-2xl font-bold text-green-50">2,847</div>
                       <div className="text-sm text-green-100">Active Students</div>
                     </div>
-                    <div className="bg-gradient-to-br from-blue-700 to-blue-600 p-4 rounded-xl border border-blue-600/40">
+                    <div className="bg-gradient-to-br from-blue-300 to-blue-600 p-4 rounded-xl border border-blue-600/40">
                       <div className="text-2xl font-bold text-blue-50">156</div>
                       <div className="text-sm text-blue-100">Courses</div>
                     </div>
@@ -223,7 +223,7 @@ const HomePage = () => {
                           key={index}
                           className="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
                         >
-                          <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-4 ">
                             <div className="w-12 h-12 bg-gradient-to-br from-green-700 to-green-600 rounded-lg flex items-center justify-center">
                               <BookOpenIcon className="w-6 h-6 text-white" />
                             </div>
@@ -233,7 +233,7 @@ const HomePage = () => {
                             </div>
                             <div className="flex items-center space-x-1">
                               <StarIcon className="w-4 h-4 text-yellow-400 fill-current" />
-                              <span className="text-sm font-medium text-gray-800">{course.rating}</span>
+                              <span className="text-sm font-medium text-gray-800 ">{course.rating} </span>
                             </div>
                           </div>
                         </div>
