@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import ProtectedRoute from '../components/ProtectedRoute';
-import Layout from '../components/Layout';
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import Layout from '../components/Layout'; // Adjust path if needed
+import ProtectedRoute from '../components/ProtectedRoute'; // Adjust path if needed
 import { 
   UserIcon, 
   PencilIcon, 
@@ -13,353 +13,296 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 
+
+interface UserProfile {
+  _id: string;
+  fullName?: string;
+  email: string;
+  phone?: string;
+  courseOfStudy?: string;
+  enrollmentYear?: number;
+  image?: string;
+  profilePicture?: string; 
+  role?: 'student' | 'admin';
+  status?: 'Active' | 'Graduated' | 'Dropped';
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL; 
+const DEFAULT_AVATAR = '/default-avatar.png'; 
+
+
+const UPLOAD_FIELD_NAME = 'image'; 
+
+
+const getSafeImageUrl = (path?: string): string => {
+  if (!path) return DEFAULT_AVATAR;
+  if (path.startsWith('http') || path.startsWith('blob:')) return path;
+  return `${API_BASE_URL}/${path}`;
+};
+
 const ProfilePage: React.FC = () => {
-  const { user, updateUser } = useAuth();
+  const router = useRouter();
+  const previewUrlRef = useRef<string | null>(null);
+
+ 
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [formData, setFormData] = useState({
-    fullName: user?.fullName || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    courseOfStudy: user?.courseOfStudy || '',
-    enrollmentYear: user?.enrollmentYear || new Date().getFullYear(),
-  });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>(DEFAULT_AVATAR);
+
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current && previewUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      setLoading(true);
+      const userId = localStorage.getItem('userId');
+      const token = localStorage.getItem('token');
+
+      if (!userId || !token) {
+        router.push('/login');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/users/me/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          let msg = `Failed to fetch profile data. Status ${response.status}`;
+          try {
+            const err = await response.json();
+            if (err.message) msg += `: ${err.message}`;
+          } catch {} 
+          throw new Error(msg);
+        }
+
+        const data = await response.json();
+        const userData: UserProfile = data.user || data;
+        setUser(userData);
+        const finalImage = userData.profilePicture ?? userData.image;
+        setImagePreview(getSafeImageUrl(finalImage));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) return;
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'enrollmentYear' ? parseInt(value) : value
-    }));
-    setError('');
+    setUser({ ...user, [name]: value });
   };
 
-  const handleSave = () => {
-    if (!formData.fullName.trim()) {
-      setError('Full name is required');
-      return;
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const blobUrl = URL.createObjectURL(file);
+  
+      if (previewUrlRef.current && previewUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+      previewUrlRef.current = blobUrl;
+      setImagePreview(blobUrl); 
     }
-    if (!formData.email.trim()) {
-      setError('Email is required');
-      return;
-    }
-    if (user?.role === 'student' && !formData.courseOfStudy.trim()) {
-      setError('Course of study is required for students');
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+
+    if (!user.fullName?.trim()) {
+      setError('Full name cannot be empty.');
       return;
     }
 
-    updateUser({
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone || undefined,
-      courseOfStudy: formData.courseOfStudy || undefined,
-      enrollmentYear: formData.enrollmentYear,
-    });
+    setSaving(true);
+    setError('');
+    setSuccess('');
 
-    setIsEditing(false);
-    setSuccess('Profile updated successfully!');
-    setTimeout(() => setSuccess(''), 3000);
+    const formData = new FormData();
+    formData.append('fullName', user.fullName || '');
+    formData.append('phone', user.phone || '');
+    
+    if (imageFile) {
+      formData.append(UPLOAD_FIELD_NAME, imageFile); 
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/users/me/${user._id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let errorMsg = `Status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.message) errorMsg += `: ${errorData.message}`;
+          else errorMsg += `: ${JSON.stringify(errorData)}`;
+        } catch {
+          const text = await response.text();
+          errorMsg += `: ${text}`;
+        }
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+      const updatedUser: UserProfile = result.user || result;
+
+      setUser(updatedUser);
+      const newImagePath = updatedUser.profilePicture ?? updatedUser.image;
+      setImagePreview(getSafeImageUrl(newImagePath));
+      setImageFile(null);
+
+      setSuccess('Profile updated successfully!');
+      setIsEditing(false);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during save.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
-    setFormData({
-      fullName: user?.fullName || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
-      courseOfStudy: user?.courseOfStudy || '',
-      enrollmentYear: user?.enrollmentYear || new Date().getFullYear(),
-    });
     setIsEditing(false);
     setError('');
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageUrl = event.target?.result as string;
-        updateUser({ profilePicture: imageUrl });
-        setSuccess('Profile picture updated!');
-        setTimeout(() => setSuccess(''), 3000);
-      };
-      reader.readAsDataURL(file);
+    
+    if (user) {
+      const finalImage = user.profilePicture ?? user.image;
+      setImagePreview(getSafeImageUrl(finalImage));
+      setImageFile(null);
     }
   };
 
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - i + 4);
-
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case 'Active':
-        return 'bg-green-100 text-green-800';
-      case 'Graduated':
-        return 'bg-blue-100 text-blue-800';
-      case 'Dropped':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-96">
+          <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <ProtectedRoute>
       <Layout>
-        <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-         
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <div>
-              <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Profile</h1>
-              <p className="text-xs sm:text-base text-gray-600">Manage your account information</p>
-            </div>
+        <div className="max-w-4xl mx-auto py-8 px-4">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
             {!isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="flex items-center justify-center space-x-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-green-700 text-white rounded-lg hover:bg-green-600 transition-colors w-full sm:w-auto text-xs sm:text-base"
+                className="flex items-center space-x-2 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800"
               >
-                <PencilIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <PencilIcon className="w-4 h-4" />
                 <span>Edit Profile</span>
               </button>
             )}
           </div>
 
-          
-          <div className="mb-4 sm:mb-6">
-            {success && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-2 sm:p-4 flex items-center space-x-2">
-                <CheckIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 flex-shrink-0" />
-                <p className="text-xs sm:text-sm text-green-700">{success}</p>
-              </div>
-            )}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-2 sm:p-4 flex items-center space-x-2">
-                <ExclamationCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
-                <p className="text-xs sm:text-sm text-red-700">{error}</p>
-              </div>
-            )}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">  
+          {error && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4">{error}</div>}
+          {success && <div className="bg-green-100 text-green-700 p-3 rounded-md mb-4">{success}</div>}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+           
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 h-full">
-                <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-4">Profile Picture</h3>
-                <div className="text-center">
-                  <div className="relative inline-block">
-                    <div className="w-20 sm:w-32 h-20 sm:h-32 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-4 overflow-hidden">
-                      {user?.profilePicture ? (
-                        <img
-                          src={user.profilePicture}
-                          alt={user.fullName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <UserIcon className="w-10 sm:w-16 h-10 sm:h-16 text-gray-600" />
-                      )}
-                    </div>
-                    <label className="absolute bottom-0 right-0 w-7 sm:w-10 h-7 sm:h-10 bg-green-900 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors">
-                      <CameraIcon className="w-3 sm:w-5 h-3 sm:h-5 text-white" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
+              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 text-center">
+                <div className="relative w-32 h-32 mx-auto">
+                  <img
+                    src={imagePreview}
+                    alt="Profile"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-gray-200"
+                  />
+                  {isEditing && (
+                    <label
+                      htmlFor="imageUpload"
+                      className="absolute bottom-0 right-0 bg-white p-2 rounded-full shadow-md cursor-pointer"
+                    >
+                      <CameraIcon className="w-5 h-5 text-gray-600" />
+                      <input title='v' id="imageUpload" type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
                     </label>
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-500">
-                    Click the camera icon to upload a new picture
-                  </p>
+                  )}
                 </div>
-
-               
-                <div className="mt-3 sm:mt-6 text-center">
-                  <span className={`inline-flex items-center px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium capitalize ${
-                    user?.role === 'admin' 
-                      ? 'bg-purple-100 text-green-800' 
-                      : 'bg-blue-100 text-green-800'
-                  }`}>
-                    {user?.role}
-                  </span>
-                </div>
-
-               
-                {user?.role === 'student' && user?.status && (
-                  <div className="mt-1 sm:mt-3 text-center">
-                    <span className={`inline-flex items-center px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${getStatusColor(user.status)}`}>
-                      {user.status}
-                    </span>
-                  </div>
-                )}
+                <h2 className="mt-4 text-xl font-semibold">{user?.fullName}</h2>
+                <p className="text-gray-500">{user?.email}</p>
+                <span className="mt-2 inline-block bg-green-100 text-green-800 px-3 py-1 text-sm font-medium rounded-full capitalize">
+                  {user?.role}
+                </span>
               </div>
             </div>
 
-           
+          
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 h-full">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-6 gap-2 sm:gap-4">
-                  <h3 className="text-sm sm:text-lg font-semibold text-gray-900">Personal Information</h3>
+              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-semibold">Personal Information</h3>
                   {isEditing && (
                     <div className="flex space-x-2">
-                      <button
-                        onClick={handleSave}
-                        className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-green-600 text-white text-xs sm:text-sm rounded hover:bg-green-700 transition-colors"
-                      >
-                        <CheckIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span>Save</span>
+                      <button onClick={handleSave} disabled={saving} className="flex items-center space-x-2 px-3 py-1.5 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:bg-green-400">
+                        <CheckIcon className="w-4 h-4" />
+                        <span>{saving ? 'Saving...' : 'Save'}</span>
                       </button>
-                      <button
-                        onClick={handleCancel}
-                        className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-blue-900 text-white text-xs sm:text-sm rounded hover:bg-gray-700 transition-colors"
-                      >
-                        <XMarkIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <button onClick={handleCancel} className="flex items-center space-x-2 px-3 py-1.5 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700">
+                        <XMarkIcon className="w-4 h-4" />
                         <span>Cancel</span>
                       </button>
                     </div>
                   )}
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
-                 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      Full Name
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                     {isEditing ? (
-                      <input
-                        type="text"
-                        name="fullName"
-                        value={formData.fullName}
-                        onChange={handleInputChange}
-                        className="w-full px-2 sm:px-3 text-gray-800 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                      <input title="g" type="text" name="fullName" value={user?.fullName || ''} onChange={handleInputChange} className="w-full border-gray-300 rounded-md shadow-sm" />
                     ) : (
-                      <p className="text-xs sm:text-sm text-gray-900 py-1 sm:py-2">{user?.fullName}</p>
+                      <p className="text-gray-900 py-2">{user?.fullName || 'N/A'}</p>
                     )}
                   </div>
-
-                 
                   <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      Email Address
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <p className="text-gray-500 py-2">{user?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                     {isEditing ? (
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-2 sm:px-3 py-1  text-gray-800 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                      <input title="g" type="text" name="phone" value={user?.phone || ''} onChange={handleInputChange} className="w-full border-gray-300 rounded-md shadow-sm" />
                     ) : (
-                      <p className="text-xs sm:text-sm text-gray-900 py-1 sm:py-2">{user?.email}</p>
+                      <p className="text-gray-900 py-2">{user?.phone || 'Not Provided'}</p>
                     )}
                   </div>
-
-                
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      Phone Number
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="w-full px-2 sm:px-3 text-gray-800  py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter phone number"
-                      />
-                    ) : (
-                      <p className="text-xs sm:text-sm text-gray-900 py-1 sm:py-2">{user?.phone || 'Not provided'}</p>
-                    )}
-                  </div>
-
-                
                   {user?.role === 'student' && (
                     <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                        Course of Study
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          name="courseOfStudy"
-                          value={formData.courseOfStudy}
-                          onChange={handleInputChange}
-                          className="w-full px-2 sm:px-3 text-gray-800 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="e.g., Computer Science"
-                        />
-                      ) : (
-                        <p className="text-xs sm:text-sm text-gray-900 py-1 sm:py-2">{user?.courseOfStudy}</p>
-                      )}
-                    </div>
-                  )}
-
-                
-                  {user?.role === 'student' && (
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                        Expected Graduation Year
-                      </label>
-                      {isEditing ? (
-                        <select
-                          name="enrollmentYear"
-                          value={formData.enrollmentYear}
-                          onChange={handleInputChange}
-                          className="w-full px-2 sm:px-3  text-gray-800 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          {yearOptions.map(year => (
-                            <option key={year} value={year}>{year}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <p className="text-xs sm:text-sm text-gray-900 py-1 sm:py-2">{user?.enrollmentYear}</p>
-                      )}
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
+                      <p className="text-gray-900 py-2 font-mono">STU-{user?._id?.slice(-6).toUpperCase()}</p>
                     </div>
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-
-         
-          <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200">
-            <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-4">Account Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Account Type
-                </label>
-                <p className="text-xs sm:text-sm text-gray-900 capitalize">{user?.role}</p>
-              </div>
-              
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Member Since
-                </label>
-                <p className="text-xs sm:text-sm text-gray-900">January 2025</p>
-              </div>
-
-              {user?.role === 'student' && (
-                <>
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      Student ID
-                    </label>
-                    <p className="text-xs sm:text-sm text-gray-900">STU{user.id.padStart(6, '0')}</p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                      Academic Status
-                    </label>
-                    <span className={`inline-flex items-center px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${getStatusColor(user.status)}`}>
-                      {user.status || 'Active'}
-                    </span>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </div>

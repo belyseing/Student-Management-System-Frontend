@@ -82,7 +82,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   ];
 
   const mockCredentials: Record<string, string> = {
-    'admin@quicktech.com': 'QuicktechAdmin2024!',
+    'admin@quicktech.com': 'QuicktechAdmin2025!',
     'belyse@student.edu': 'BelysePassword123!',
     'igor@student.edu': 'IgorPassword456!'
   };

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../context/AuthContext';
+
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const RegisterPage: React.FC = () => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -23,14 +24,7 @@ const RegisterPage: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { register, user } = useAuth();
   const router = useRouter();
-
-  useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -41,38 +35,70 @@ const RegisterPage: React.FC = () => {
     setError('');
   };
 
-  const validateForm = () => {
-    if (!formData.email.trim()) return setError('Email is required'), false;
-    if (!formData.email.includes('@')) return setError('Enter a valid email'), false;
-    if (formData.password.length < 6) return setError('Password must be at least 6 characters'), false;
-    if (formData.password !== formData.confirmPassword) return setError('Passwords do not match'), false;
+  const validateForm = (): boolean => {
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      setError('Enter a valid email address');
+      return false;
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return false;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
 
     setLoading(true);
 
+    if (!apiBaseUrl) {
+        setError('API configuration error. Please contact support.');
+        setLoading(false);
+        return;
+    }
+
     try {
-      const result = await register({
-        fullName: formData.email.split('@')[0], 
-        email: formData.email,
-        password: formData.password,
+      const response = await fetch(`${apiBaseUrl}/users/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
       });
 
-      if (result.success) {
-        setSuccess('Registration successful! Redirecting...');
-        setTimeout(() => router.push('/dashboard'), 2000);
-      } else {
-        setError(result.message);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.message || 'Registration failed. Please try again.');
+        return;
       }
-    } catch {
-      setError('An unexpected error occurred');
+
+      setSuccess('Account created successfully! Redirecting...');
+      
+      if (result?.user?._id) {
+        localStorage.setItem('userId', result.user._id);
+      }
+      
+      setTimeout(() => {
+        router.push('/');
+      }, 2000);
+
+    } catch (err) {
+      console.error(err);
+      setError('A network error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -203,4 +229,4 @@ const RegisterPage: React.FC = () => {
   );
 };
 
-export default RegisterPage;
+export default RegisterPage;

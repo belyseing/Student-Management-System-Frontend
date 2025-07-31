@@ -1,28 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
+
 import ProtectedRoute from '../../components/ProtectedRoute';
 import Layout from '../../components/Layout';
-import { 
-  UserIcon, 
-  PencilIcon, 
+
+import {
+  UserIcon,
+  PencilIcon,
   CheckIcon,
   XMarkIcon,
   ArrowLeftIcon,
-  EnvelopeIcon,
-  PhoneIcon,
-  AcademicCapIcon,
-  CalendarIcon,
   TrashIcon,
   UserPlusIcon,
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 
-interface Student {
-  id: string;
+interface StudentFromAPI {
+  _id: string;
   fullName: string;
   email: string;
   phone?: string;
@@ -30,101 +28,105 @@ interface Student {
   enrollmentYear: number;
   status: 'Active' | 'Graduated' | 'Dropped';
   profilePicture?: string;
-  role: 'student' | 'admin'; 
+  role: 'student' | 'admin';
+  createdAt?: string;
+}
+
+interface DisplayStudent {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  courseOfStudy: string;
+  enrollmentYear: number;
+  status: 'Active' | 'Graduated' | 'Dropped';
+  profilePicture?: string;
+  role: 'student' | 'admin';
 }
 
 const StudentDetailsPage: React.FC = () => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const router = useRouter();
-  const { user } = useAuth();
-  const [student, setStudent] = useState<Student | null>(null);
+  const params = useParams();
+  const studentId = params?.id as string;
+
+  const [student, setStudent] = useState<DisplayStudent | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  
-  const [formData, setFormData] = useState<{
-    fullName: string;
-    email: string;
-    phone: string;
-    courseOfStudy: string;
-    enrollmentYear: number;
-    status: Student['status'];
-  }>({
+
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
     courseOfStudy: '',
     enrollmentYear: new Date().getFullYear(),
-    status: 'Active',
+    status: 'Active' as DisplayStudent['status'],
   });
 
-  
-  const mockStudents: Student[] = [
-    {
-      id: '2',
-      fullName: 'John Doe',
-      email: 'john.doe@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Computer Science',
-      enrollmentYear: 2023,
-      status: 'Active',
-      role: 'student',
-    },
-    {
-      id: '3',
-      fullName: 'Jane Smith',
-      email: 'jane.smith@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Software Engineering',
-      enrollmentYear: 2022,
-      status: 'Active',
-      role: 'student',
-    },
-    {
-      id: '4',
-      fullName: 'Mike Johnson',
-      email: 'mike.johnson@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Data Science',
-      enrollmentYear: 2021,
-      status: 'Graduated',
-      role: 'student',
-    },
-    {
-      id: '5',
-      fullName: 'Sarah Wilson',
-      email: 'sarah.wilson@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Computer Science',
-      enrollmentYear: 2024,
-      status: 'Active',
-      role: 'student',
-    },
-  ];
-
   useEffect(() => {
-    
-    const pathParts = window.location.pathname.split('/');
-    const studentId = pathParts[pathParts.length - 1];
-   
-    const foundStudent = mockStudents.find(s => s.id === studentId);
-    
-    if (foundStudent) {
-      setStudent(foundStudent);
-      setFormData({
-        fullName: foundStudent.fullName,
-        email: foundStudent.email,
-        phone: foundStudent.phone || '',
-        courseOfStudy: foundStudent.courseOfStudy,
-        enrollmentYear: foundStudent.enrollmentYear,
-        status: foundStudent.status,
-      });
-    } else {
-      setError('Student not found');
+    if (!studentId) {
+      setError('Student ID not found in URL.');
+      setLoading(false);
+      return;
     }
-    
-    setLoading(false);
-  }, []);
+
+    const fetchStudentData = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error("Authentication token not found. Please log in.");
+
+        const response = await fetch(`${apiBaseUrl}/students/one/${studentId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) throw new Error("Student not found.");
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch student data');
+        }
+
+        const data: StudentFromAPI = await response.json();
+
+        const transformedStudent: DisplayStudent = {
+          id: data._id,
+          fullName: data.fullName,
+          email: data.email,
+          phone: data.phone || 'N/A',
+          courseOfStudy: data.courseOfStudy,
+          enrollmentYear: data.enrollmentYear,
+          status: data.status,
+          role: data.role,
+          profilePicture: data.profilePicture,
+        };
+
+        setStudent(transformedStudent);
+        setFormData({
+          fullName: transformedStudent.fullName,
+          email: transformedStudent.email,
+          phone: transformedStudent.phone === 'N/A' ? '' : transformedStudent.phone,
+          courseOfStudy: transformedStudent.courseOfStudy,
+          enrollmentYear: transformedStudent.enrollmentYear,
+          status: transformedStudent.status,
+        });
+
+      } catch (err: any) {
+        setError(err.message || 'An unknown error occurred.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudentData();
+  }, [studentId, apiBaseUrl]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -135,38 +137,85 @@ const StudentDetailsPage: React.FC = () => {
     setError('');
   };
 
-  const handleSave = () => {
-    if (!formData.fullName.trim() || !formData.email.trim() || !formData.courseOfStudy.trim()) {
-      setError('Please fill in all required fields');
+  const handleSave = async () => {
+    if (!student) {
+      toast.error("Cannot save. Student data is not loaded correctly.");
+      return;
+    }
+    if (!formData || !student) {
+      toast.error("Cannot save. Student data is not loaded correctly.");
       return;
     }
 
-   
-    if (student) {
-      const updatedStudent: Student = {
-        ...student,
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone || undefined,
-        courseOfStudy: formData.courseOfStudy,
-        enrollmentYear: formData.enrollmentYear,
-        status: formData.status,
-        role: student.role, 
+    if (!formData.fullName?.trim() || !formData.email?.trim() || !formData.courseOfStudy?.trim()) {
+      toast.error('Full Name, Email, and Course of Study are required.');
+      return;
+    }
+
+    setIsSaving(true);
+    const submissionData = new FormData();
+
+    submissionData.append('fullName', formData.fullName);
+    submissionData.append('email', formData.email);
+    submissionData.append('phone', formData.phone);
+    submissionData.append('courseOfStudy', formData.courseOfStudy);
+    submissionData.append('enrollmentYear', (formData.enrollmentYear ?? new Date().getFullYear()).toString());
+    submissionData.append('status', formData.status);
+
+    if (selectedImage) {
+      submissionData.append('image', selectedImage);
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${apiBaseUrl}/students/${student.id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: submissionData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Update failed.");
+      }
+
+      const updatedData: StudentFromAPI = await response.json();
+
+      const updatedStudent: DisplayStudent = {
+        id: updatedData._id,
+        fullName: updatedData.fullName,
+        email: updatedData.email,
+        phone: updatedData.phone || '',
+        courseOfStudy: updatedData.courseOfStudy,
+        enrollmentYear: updatedData.enrollmentYear,
+        status: updatedData.status,
+        role: updatedData.role,
+        profilePicture: updatedData.profilePicture || '/default-avatar.png',
       };
-      
+
       setStudent(updatedStudent);
       setIsEditing(false);
-      setSuccess('Student information updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      setSelectedImage(null);
+      setPreviewUrl(null);
+      toast.success('Student information updated successfully!');
+
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update student.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
+    if (!student) {
+      toast.error("Cannot cancel. Student data not loaded.");
+      return;
+    }
     if (student) {
       setFormData({
         fullName: student.fullName,
         email: student.email,
-        phone: student.phone || '',
+        phone: student.phone === 'N/A' ? '' : student.phone,
         courseOfStudy: student.courseOfStudy,
         enrollmentYear: student.enrollmentYear,
         status: student.status,
@@ -176,35 +225,66 @@ const StudentDetailsPage: React.FC = () => {
     setError('');
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this student? This action cannot be undone.')) {
-    
-      alert('Student deleted successfully!');
-      router.push('/students');
+  const handleDelete = async () => {
+    if (!student) {
+      toast.error("Cannot delete. Student data not loaded.");
+      return;
     }
-  };
+    if (student && window.confirm('Are you sure you want to delete this student? This action is irreversible.')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${apiBaseUrl}/students/${student.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
 
-  const handlePromoteToAdmin = () => {
-    if (confirm('Are you sure you want to promote this student to admin?')) {
-     
-      alert('Student promoted to admin successfully!');
-    
-      if (student) {
-        setStudent({ ...student, role: 'admin' });
+        if (!response.ok) throw new Error("Delete operation failed.");
+
+        toast.success('Student deleted successfully!');
+        router.push('/students');
+      } catch (error) {
+        toast.error('Failed to delete student.');
+        console.error(error);
       }
     }
   };
 
-  const getStatusColor = (status: Student['status']) => {
+  const handlePromoteToAdmin = async () => {
+    if (student && window.confirm('Are you sure you want to promote this student to an Admin role?')) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error("You are not authenticated.");
+
+        const response = await fetch(`${apiBaseUrl}/users/change-role/${student.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ role: 'admin' })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Promotion failed.");
+        }
+
+        setStudent({ ...student, role: 'admin' });
+        toast.success('Student promoted to Admin!');
+
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to promote student.');
+        console.error(error);
+      }
+    }
+  };
+
+  const getStatusColor = (status: DisplayStudent['status']) => {
     switch (status) {
-      case 'Active':
-        return 'bg-green-100 text-green-800';
-      case 'Graduated':
-        return 'bg-blue-100 text-blue-800';
-      case 'Dropped':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'Active': return 'bg-green-100 text-green-800';
+      case 'Graduated': return 'bg-blue-100 text-blue-800';
+      case 'Dropped': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -213,28 +293,25 @@ const StudentDetailsPage: React.FC = () => {
 
   if (loading) {
     return (
-     <ProtectedRoute requiredRole="admin">
+      <ProtectedRoute requiredRole="admin">
         <Layout>
           <div className="flex items-center justify-center min-h-[24rem]">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+            Loading....
           </div>
         </Layout>
       </ProtectedRoute>
     );
   }
 
-  if (!student) {
+  if (error || !student) {
     return (
-     <ProtectedRoute requiredRole="admin">
+      <ProtectedRoute requiredRole="admin">
         <Layout>
           <div className="text-center py-12">
             <ExclamationCircleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Student Not Found</h2>
-            <p className="text-gray-600 mb-4">The student you're looking for doesn't exist.</p>
-            <Link
-              href="/students"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{error ? "An Error Occurred" : "Student Not Found"}</h2>
+            <p className="text-gray-600 mb-4">{error || "The student you're looking for doesn't exist."}</p>
+            <Link href="/students" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg">
               <ArrowLeftIcon className="w-4 h-4 mr-2" />
               Back to Students
             </Link>
@@ -245,267 +322,85 @@ const StudentDetailsPage: React.FC = () => {
   }
 
   return (
-   <ProtectedRoute requiredRole="admin">
+    <ProtectedRoute requiredRole="admin">
       <Layout>
         <div className="max-w-4xl mx-auto space-y-6">
-    
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/students"
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeftIcon className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Student Details</h1>
-                <p className="text-gray-600">View and manage student information</p>
-              </div>
-            </div>
-            
+            <Link href="/students" className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+              <ArrowLeftIcon className="w-5 h-5" />
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">Student Details</h1>
             <div className="flex items-center space-x-2">
               {!isEditing && (
                 <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <PencilIcon className="w-4 h-4" />
-                    <span>Edit</span>
+                  <button onClick={() => setIsEditing(true)} className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg">
+                    <PencilIcon className="w-4 h-4" /> <span>Edit</span>
                   </button>
-                  <button
-                    onClick={handlePromoteToAdmin}
-                    className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                  >
-                    <UserPlusIcon className="w-4 h-4" />
-                    <span>Promote</span>
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                    <span>Delete</span>
+                  {student.role !== 'admin' && (
+                    <button onClick={handlePromoteToAdmin} className="flex items-center space-x-2 px-3 py-2 bg-purple-600 text-white rounded-lg">
+                      <UserPlusIcon className="w-4 h-4" /> <span>Promote</span>
+                    </button>
+                  )}
+                  <button onClick={handleDelete} className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg">
+                    <TrashIcon className="w-4 h-4" /> <span>Delete</span>
                   </button>
                 </>
               )}
             </div>
           </div>
-
-        
-          {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-2">
-              <CheckIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
-              <p className="text-sm text-green-700">{success}</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
-              <ExclamationCircleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-         
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                <div className="text-center">
-                  <div className="w-32 h-32 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden">
-                    {student.profilePicture ? (
-                      <img
-                        src={student.profilePicture}
-                        alt={student.fullName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <UserIcon className="w-16 h-16 text-gray-600" />
-                    )}
-                  </div>
-                  
-                  <h2 className="text-xl font-bold text-gray-900 mb-2">
-                    {student.fullName}
-                  </h2>
-                  
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(student.status)}`}>
-                    {student.status}
+            <div className="lg:col-span-1 bg-white rounded-lg p-6 shadow-sm border">
+              <div className="text-center">
+                <UserIcon className="w-32 h-32 text-gray-400 bg-gray-200 p-4 rounded-full mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-gray-900 mb-1">{student.fullName}</h2>
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(student.status)}`}>
+                  {student.status}
+                </span>
+                {student.role === 'admin' && (
+                  <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                    Admin
                   </span>
-                  
-                  <div className="mt-4 space-y-3">
-                    <div className="flex items-center justify-center space-x-2 text-gray-600">
-                      <EnvelopeIcon className="w-4 h-4" />
-                      <span className="text-sm">{student.email}</span>
-                    </div>
-                    
-                    {student.phone && (
-                      <div className="flex items-center justify-center space-x-2 text-gray-600">
-                        <PhoneIcon className="w-4 h-4" />
-                        <span className="text-sm">{student.phone}</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-center space-x-2 text-gray-600">
-                      <AcademicCapIcon className="w-4 h-4" />
-                      <span className="text-sm">{student.courseOfStudy}</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-center space-x-2 text-gray-600">
-                      <CalendarIcon className="w-4 h-4" />
-                      <span className="text-sm">Class of {student.enrollmentYear}</span>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
-
-          
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Student Information</h3>
-                  {isEditing && (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={handleSave}
-                        className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                      >
-                        <CheckIcon className="w-4 h-4" />
-                        <span>Save</span>
-                      </button>
-                      <button
-                        onClick={handleCancel}
-                        className="flex items-center space-x-1 px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
-                      >
-                        <XMarkIcon className="w-4 h-4" />
-                        <span>Cancel</span>
-                      </button>
-                    </div>
-                  )}
+            <div className="lg:col-span-2 bg-white rounded-lg p-6 shadow-sm border">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">Student Information</h3>
+                {isEditing && (
+                  <div className="flex space-x-2">
+                    <button onClick={handleSave} className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded">
+                      <CheckIcon className="w-4 h-4" /> <span>Save</span>
+                    </button>
+                    <button onClick={handleCancel} className="flex items-center space-x-1 px-3 py-1 bg-gray-600 text-white text-sm rounded">
+                      <XMarkIcon className="w-4 h-4" /> <span>Cancel</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  {isEditing ? <input title='h' type="text" name="fullName" value={formData.fullName} onChange={handleInputChange} className="w-full p-2 border rounded-lg" /> : <p className="text-gray-900 py-2">{student.fullName}</p>}
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        name="fullName"
-                        value={formData.fullName}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border text-gray-800 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    ) : (
-                      <p className="text-gray-900 py-2">{student.fullName}</p>
-                    )}
-                  </div>
-
-           
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 text-gray-800 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    ) : (
-                      <p className="text-gray-900 py-2">{student.email}</p>
-                    )}
-                  </div>
-
-           
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 text-gray-800 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    ) : (
-                      <p className="text-gray-900 py-2">{student.phone || '-'}</p>
-                    )}
-                  </div>
-
-              
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Course of Study
-                    </label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        name="courseOfStudy"
-                        value={formData.courseOfStudy}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 text-gray-800 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    ) : (
-                      <p className="text-gray-900 py-2">{student.courseOfStudy}</p>
-                    )}
-                  </div>
-
-               
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Enrollment Year
-                    </label>
-                    {isEditing ? (
-                      <select
-                        name="enrollmentYear"
-                        value={formData.enrollmentYear}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 text-gray-800 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        {yearOptions.map((year) => (
-                          <option key={year} value={year}>
-                            {year}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <p className="text-gray-900 py-2">{student.enrollmentYear}</p>
-                    )}
-                  </div>
-
-            
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Status
-                    </label>
-                    {isEditing ? (
-                      <select
-                        name="status"
-                        value={formData.status}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 text-gray-800 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Graduated">Graduated</option>
-                        <option value="Dropped">Dropped</option>
-                      </select>
-                    ) : (
-                      <span
-                        className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                          student.status
-                        )}`}
-                      >
-                        {student.status}
-                      </span>
-                    )}
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  {isEditing ? <input title='h' type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full p-2 border rounded-lg" /> : <p className="text-gray-900 py-2">{student.email}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  {isEditing ? <input title='j' type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full p-2 border rounded-lg" /> : <p className="text-gray-900 py-2">{student.phone}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
+                  {isEditing ? <input title='j' type="text" name="courseOfStudy" value={formData.courseOfStudy} onChange={handleInputChange} className="w-full p-2 border rounded-lg" /> : <p className="text-gray-900 py-2">{student.courseOfStudy}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  {isEditing ? <select title='s' name="enrollmentYear" value={formData.enrollmentYear} onChange={handleInputChange} className="w-full p-2 border rounded-lg">{yearOptions.map(y => <option key={y} value={y}>{y}</option>)}</select> : <p className="text-gray-900 py-2">{student.enrollmentYear}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  {isEditing ? <select title='s' name="status" value={formData.status} onChange={handleInputChange} className="w-full p-2 border rounded-lg"><option value="Active">Active</option><option value="Graduated">Graduated</option><option value="Dropped">Dropped</option></select> : <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(student.status)}`}>{student.status}</span>}
                 </div>
               </div>
             </div>

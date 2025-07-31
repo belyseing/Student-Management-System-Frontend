@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '../context/AuthContext';
+
 import {
   AcademicCapIcon,
   StarIcon,
@@ -14,83 +14,80 @@ import {
 } from '@heroicons/react/24/outline';
 
 const HomePage = () => {
-  const { user, login } = useAuth();
   const router = useRouter();
+  
+ 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
-
-  if (user) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-      </div>
-    );
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
+    setError('');
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    if (!apiBaseUrl) {
+        setError('API configuration error. Please contact an administrator.');
+        setLoading(false);
+        return;
+    }
 
     try {
-      const result = await login(email, password);
-      if (result.success) {
-        router.push('/dashboard');
-      } else {
-        setError(result.message || 'Invalid credentials');
+      const res = await fetch(`${apiBaseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || 'Login failed. Please check your credentials.');
+      }
+
+      const { user, token } = result;
+      const userRole = user?.role;
+
+      if (!userRole || !token) {
+        throw new Error('Login response from server was invalid.');
+      }
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('role', userRole);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('userId', user?._id);
+
+      switch (userRole.toLowerCase()) {
+        case 'student':
+          router.push('/dashboard');
+          break;
+        case 'admin':
+          router.push('/students');
+          break;
+        default:
+          router.push('/');
+          break;
       }
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const fillDemoCredentials = (type: 'admin' | 'student') => {
-    if (type === 'admin') {
-      setEmail('admin@university.edu');
-      setPassword('admin123');
-    } else {
-      setEmail('john.doe@student.edu');
-      setPassword('student123');
-    }
-  };
-
   const courses = [
-    {
-      title: 'Computer Science',
-      instructor: 'Dr. Sarah Wilson',
-      students: '2,847',
-      rating: 4.9,
-      duration: '16 weeks',
-    },
-    {
-      title: 'Business Administration',
-      instructor: 'Prof. Michael Chen',
-      students: '1,923',
-      rating: 4.8,
-      duration: '12 weeks',
-    },
-    {
-      title: 'Digital Marketing',
-      instructor: 'Emma Rodriguez',
-      students: '3,156',
-      rating: 4.9,
-      duration: '8 weeks',
-    },
+    { title: 'Computer Science', students: '2,847', rating: 4.9 },
+    { title: 'Business Administration', students: '1,923', rating: 4.8 },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-800 relative overflow-hidden">
+    <div className="min-h-screen bg-gray-100 text-gray-800">
+     
       <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -104,10 +101,7 @@ const HomePage = () => {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Link
-                href="/register"
-                className="px-6 py-2.5 font-semibold text-white hover:text-green-100 bg-green-700 hover:bg-green-800 transition-all duration-300 rounded-lg"
-              >
+              <Link href="/register" className="px-6 py-2.5 font-semibold text-white bg-green-700 hover:bg-green-800 transition-all duration-300 rounded-lg">
                 Register
               </Link>
             </div>
@@ -115,23 +109,26 @@ const HomePage = () => {
         </div>
       </header>
 
+
       <main className="pt-24 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid lg:grid-cols-2 gap-16 min-h-[calc(100vh-200px)] items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            
+            
             <div className="bg-gray-50 p-8 rounded-2xl shadow-xl w-full max-w-md mx-auto border border-gray-200">
               <h2 className="text-3xl font-bold mb-6 text-gray-800">Sign in to SMS</h2>
 
               {error && (
-                <div className="flex items-center gap-2 text-red-500 text-sm mb-4">
-                  <ExclamationCircleIcon className="w-5 h-5" />
-                  {error}
+                <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm mb-4 border border-red-200">
+                  <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
+                  <span>{error}</span>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="block text-sm text-gray-700 mb-1" htmlFor="email">
-                    Email:
+                    Email Address
                   </label>
                   <input
                     id="email"
@@ -139,14 +136,14 @@ const HomePage = () => {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                    placeholder="belyse@gmail.com"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    placeholder="e.g., admin@university.edu"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm text-gray-700 mb-1" htmlFor="password">
-                    Password:
+                    Password
                   </label>
                   <div className="relative">
                     <input
@@ -155,39 +152,30 @@ const HomePage = () => {
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-800 focus:outline-none focus:ring-green-500 focus:border-green-500"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      placeholder="••••••••"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
                     >
-                      {showPassword ? (
-                        <EyeSlashIcon className="w-5 h-5" />
-                      ) : (
-                        <EyeIcon className="w-5 h-5" />
-                      )}
+                      {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center space-x-2">
-                    <input type="checkbox" className="form-checkbox text-green-600" />
-                    <span className="text-sm text-gray-600">Remember me</span>
-                  </label>
-
-                  <p className="text-sm text-green-600 hover:underline">
-                    Forgot password?
-                  </p>
-                </div>
-
+                
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-green-700 to-green-600 text-white font-semibold rounded-lg shadow hover:from-green-600 hover:to-green-500 transition disabled:opacity-70"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-green-700 to-green-600 text-white font-semibold rounded-lg shadow-md hover:from-green-600 hover:to-green-500 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  {loading ? 'Signing In...' : 'Sign In'}
+                  {loading ? (
+                    <>
+                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                      Signing In...
+                    </>
+                  ) : 'Sign In'}
                 </button>
               </form>
 
@@ -199,6 +187,7 @@ const HomePage = () => {
               </p>
             </div>
 
+           
             <div className="relative h-full min-h-[700px] lg:min-h-[800px]">
               <div className="absolute inset-0 bg-gradient-to-br from-green-100 via-green-50 to-gray-100 rounded-3xl blur-3xl"></div>
               <div className="relative w-full h-full bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200">
@@ -252,18 +241,7 @@ const HomePage = () => {
                     </div>
                   </div>
 
-                  <div className="bg-gray-100 rounded-xl p-4 border border-gray-200">
-                    <h5 className="text-sm font-semibold text-gray-800 mb-3">Student Activity</h5>
-                    <div className="flex items-end space-x-2 h-20">
-                      {Array.from({ length: 7 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="flex-1 bg-gradient-to-t from-green-600 to-green-500 rounded-t opacity-90"
-                          style={{ height: `${Math.random() * 60 + 20}%` }}
-                        ></div>
-                      ))}
-                    </div>
-                  </div>
+                  
                 </div>
               </div>
             </div>
@@ -271,15 +249,11 @@ const HomePage = () => {
         </div>
       </main>
 
-      <footer className="mt-32 bg-white text-gray-700  border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center space-y-8">
-            <div>
-              <p className="text-gray-600">
-                © 2025 Student Management System. Built for education.
-              </p>
-            </div>
-          </div>
+      <footer className="bg-white text-gray-700 border-t border-gray-200 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
+            <p className="text-gray-600 text-sm">
+              © {new Date().getFullYear()} Student Management System. All rights reserved.
+            </p>
         </div>
       </footer>
     </div>

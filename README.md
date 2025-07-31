@@ -70,7 +70,7 @@ A full-stack Student Management System built with Next.js, Express.js, and Mongo
 ### Default Accounts
  #### Admin Account:
   - **Email**: admin@quicktech.com
-  - **password**: QuicktechAdmin2024!
+  - **password**: QuicktechAdmin2025!
 #### Student Accounts:
  1. - Email: belyse@student.edu
      - Password: BelysePassword123!

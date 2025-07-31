@@ -1,162 +1,277 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
+
 import ProtectedRoute from '../../components/ProtectedRoute';
 import Layout from '../../components/Layout';
-import { 
-  UserIcon, 
-  PlusIcon, 
+
+
+import {
+  UserIcon,
+  PlusIcon,
   EyeIcon,
-  PencilIcon,
   TrashIcon,
   MagnifyingGlassIcon,
-  AcademicCapIcon,
-  UserPlusIcon
 } from '@heroicons/react/24/outline';
 
-interface Student {
-  id: string;
+
+interface StudentFromAPI {
+  _id: string;
   fullName: string;
   email: string;
   phone?: string;
-  courseOfStudy: string;
+  course: string;
+  enrollmentYear: number;
+  status: 'Active' | 'Graduated' | 'Dropped';
+  profilePicture?: string;
+  createdAt?: string; 
+}
+
+
+interface DisplayStudent {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  course: string;
   enrollmentYear: number;
   status: 'Active' | 'Graduated' | 'Dropped';
   profilePicture?: string;
 }
 
 const StudentsIndexPage: React.FC = () => {
-  const { user } = useAuth();
-  
- 
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: '2',
-      fullName: 'John Doe',
-      email: 'john.doe@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Computer Science',
-      enrollmentYear: 2023,
-      status: 'Active',
-    },
-    {
-      id: '3',
-      fullName: 'Jane Smith',
-      email: 'jane.smith@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Software Engineering',
-      enrollmentYear: 2022,
-      status: 'Active',
-    },
-    {
-      id: '4',
-      fullName: 'Mike Johnson',
-      email: 'mike.johnson@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Data Science',
-      enrollmentYear: 2021,
-      status: 'Graduated',
-    },
-    {
-      id: '5',
-      fullName: 'Sarah Wilson',
-      email: 'sarah.wilson@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Computer Science',
-      enrollmentYear: 2024,
-      status: 'Active',
-    },
-    {
-      id: '6',
-      fullName: 'David Brown',
-      email: 'david.brown@student.edu',
-      phone: '+250 734567891',
-      courseOfStudy: 'Cybersecurity',
-      enrollmentYear: 2023,
-      status: 'Dropped',
-    },
-  ]);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  const [students, setStudents] = useState<DisplayStudent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
   const [showAddModal, setShowAddModal] = useState(false);
+  
+  // --- MODIFIED ---
+  // Added password to the initial state for the new student form
   const [newStudent, setNewStudent] = useState({
     fullName: '',
     email: '',
+    password: '', // Added password field
     phone: '',
-    courseOfStudy: '',
+    course: '',
     enrollmentYear: new Date().getFullYear(),
     status: 'Active' as const,
   });
 
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = localStorage.getItem('token');
 
+        if (!token) {
+          throw new Error("Authentication token not found. Please log in.");
+        }
+
+        const response = await fetch(`${apiBaseUrl}/students`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch students');
+        }
+
+        const data: StudentFromAPI[] = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error("API response is not an array as expected.");
+        }
+        
+        const sortedData = data.sort((a, b) => {
+          if (a.createdAt && b.createdAt) {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          }
+          return 0;
+        });
+
+        const transformedStudents: DisplayStudent[] = sortedData.map((student) => ({
+          id: student._id,
+          fullName: student.fullName,
+          email: student.email,
+          phone: student.phone || 'N/A',
+          course: student.course,
+          enrollmentYear: student.enrollmentYear,
+          status: student.status,
+          profilePicture: student.profilePicture,
+        }));
+
+        setStudents(transformedStudents);
+
+      } catch (err: any) {
+        setError(err.message || "An unknown error occurred.");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, [apiBaseUrl]);
+
+  // Memoized filtered students
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
+      const searchLower = searchTerm.toLowerCase();
       const matchesSearch = 
-        student.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.courseOfStudy.toLowerCase().includes(searchTerm.toLowerCase());
+        (student.fullName?.toLowerCase() ?? '').includes(searchLower) ||
+        (student.email?.toLowerCase() ?? '').includes(searchLower) ||
+        (student.course?.toLowerCase() ?? '').includes(searchLower);
       
-      const matchesCourse = !filterCourse || student.courseOfStudy === filterCourse;
+      const matchesCourse = !filterCourse || student.course === filterCourse;
       const matchesStatus = !filterStatus || student.status === filterStatus;
       
       return matchesSearch && matchesCourse && matchesStatus;
     });
   }, [students, searchTerm, filterCourse, filterStatus]);
 
+ 
+ const uniqueCourses = useMemo(() => {
+  return Array.from(new Set(students.map(s => s.course).filter(Boolean)));
+}, [students]);
 
-  const uniqueCourses = useMemo(() => {
-    return Array.from(new Set(students.map(s => s.courseOfStudy)));
-  }, [students]);
-
-  const handleAddStudent = () => {
-    if (!newStudent.fullName || !newStudent.email || !newStudent.courseOfStudy) {
-      alert('Please fill in all required fields');
+ 
+  const handleAddStudent = async () => {
+ 
+    if (!newStudent.fullName || !newStudent.email || !newStudent.course || !newStudent.password) {
+      toast.error('Please fill in all required fields, including password');
       return;
     }
 
-    const student: Student = {
-      id: String(students.length + 1),
-      ...newStudent,
-    };
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication token is missing. Please log in again.');
+        return;
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/students`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization':`Bearer ${token}`,
+        },
+       
+        body: JSON.stringify(newStudent),
+      });
 
-    setStudents([...students, student]);
-    setNewStudent({
-      fullName: '',
-      email: '',
-      phone: '',
-      courseOfStudy: '',
-      enrollmentYear: new Date().getFullYear(),
-      status: 'Active',
-    });
-    setShowAddModal(false);
-  };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add student');
+      }
 
-  const handleDeleteStudent = (id: string) => {
-    if (confirm('Are you sure you want to delete this student?')) {
-      setStudents(students.filter(s => s.id !== id));
+      const createdStudent: StudentFromAPI = await response.json();
+      
+      const displayStudent: DisplayStudent = {
+        id: createdStudent._id,
+        fullName: createdStudent.fullName,
+        email: createdStudent.email,
+        phone: createdStudent.phone || 'N/A',
+        course: createdStudent.course,
+        enrollmentYear: createdStudent.enrollmentYear,
+        status: createdStudent.status,
+        profilePicture: createdStudent.profilePicture,
+      };
+      
+     
+      setStudents(prev => [displayStudent, ...prev]);
+      toast.success('Student added successfully!');
+      setShowAddModal(false);
+      
+      
+      setNewStudent({
+        fullName: '',
+        email: '',
+        password: '', 
+        phone: '',
+        course: '',
+        enrollmentYear: new Date().getFullYear(),
+        status: 'Active',
+      });
+
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred while adding the student.');
+      console.error(error);
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: Student['status']) => {
-    setStudents(students.map(s => 
-      s.id === id ? { ...s, status: newStatus } : s
-    ));
+
+  const handleDeleteStudent = async (id: string) => {
+    if (confirm('Are you sure you want to delete this student?')) {
+      const originalStudents = [...students];
+      const updatedStudents = students.filter(s => s.id !== id);
+      setStudents(updatedStudents);
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${apiBaseUrl}/students/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          throw new Error("Delete failed.");
+        }
+        toast.success("Student deleted successfully.");
+
+      } catch (error) {
+        toast.error("Failed to delete student.");
+        setStudents(originalStudents);
+        console.error(error);
+      }
+    }
+  };
+
+  const handleStatusChange = async (id: string, newStatus: DisplayStudent['status']) => {
+    const originalStudents = [...students];
+    setStudents(students.map(s => s.id === id ? { ...s, status: newStatus } : s));
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${apiBaseUrl}/students/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: newStatus }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Status update failed.");
+        }
+        toast.success("Status updated.");
+
+    } catch (error) {
+        toast.error("Failed to update status.");
+        setStudents(originalStudents);
+    }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Active':
-        return 'bg-green-100 text-green-800';
-      case 'Graduated':
-        return 'bg-blue-100 text-blue-800';
-      case 'Dropped':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'Active': return 'bg-green-100 text-green-800';
+      case 'Graduated': return 'bg-blue-100 text-blue-800';
+      case 'Dropped': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -168,6 +283,7 @@ const StudentsIndexPage: React.FC = () => {
       <Layout>
         <div className="space-y-6">
   
+         
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Students</h1>
@@ -182,283 +298,188 @@ const StudentsIndexPage: React.FC = () => {
             </button>
           </div>
 
-      
+         
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Students</p>
-                  <p className="text-2xl font-bold text-gray-900">{students.length}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <UserIcon className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
+                <p className="text-sm text-gray-600">Total Students</p>
+                <p className="text-2xl font-bold text-gray-900">{students.length}</p>
             </div>
-
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Active Students</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {students.filter(s => s.status === 'Active').length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <UserIcon className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
+             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                <p className="text-sm text-gray-600">Active Students</p>
+                <p className="text-2xl font-bold text-gray-900">{students.filter(s => s.status === 'Active').length}</p>
             </div>
-
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Graduates</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {students.filter(s => s.status === 'Graduated').length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <AcademicCapIcon className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
+                <p className="text-sm text-gray-600">Graduates</p>
+                <p className="text-2xl font-bold text-gray-900">{students.filter(s => s.status === 'Graduated').length}</p>
             </div>
-
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Courses</p>
-                  <p className="text-2xl font-bold text-gray-900">{uniqueCourses.length}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <AcademicCapIcon className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
+             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                <p className="text-sm text-gray-600">Courses</p>
+                <p className="text-2xl font-bold text-gray-900">{uniqueCourses.length}</p>
             </div>
           </div>
 
-   
+         
           <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4">
-        
-              <div className="flex-1 text-black">
-                <div className="relative">
-                  <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+             <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Search students..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg"
                   />
                 </div>
-              </div>
-
-            
-              <div className="w-full lg:w-48 text-black">
                 <select
+                  title="Filter by course"
                   value={filterCourse}
                   onChange={(e) => setFilterCourse(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full lg:w-48 px-3 py-2 border rounded-lg"
                 >
                   <option value="">All Courses</option>
-                  {uniqueCourses.map(course => (
-                    <option key={course} value={course}>{course}</option>
-                  ))}
+                  {uniqueCourses.map(course => <option key={course} value={course}>{course}</option>)}
                 </select>
-              </div>
-
-       
-              <div className="w-full lg:w-48 text-black">
                 <select
+                  title="Filter by status"
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full px-3 py-2  border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full lg:w-48 px-3 py-2 border rounded-lg"
                 >
                   <option value="">All Status</option>
                   <option value="Active">Active</option>
                   <option value="Graduated">Graduated</option>
                   <option value="Dropped">Dropped</option>
                 </select>
-              </div>
-            </div>
+             </div>
           </div>
 
-       
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        
+          <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left py-3 px-6 text-sm font-medium text-gray-700">Student</th>
-                    <th className="text-left py-3 px-6 text-sm font-medium text-gray-700">Course</th>
-                    <th className="text-left py-3 px-6 text-sm font-medium text-gray-700">Year</th>
-                    <th className="text-left py-3 px-6 text-sm font-medium text-gray-700">Status</th>
-                    <th className="text-left py-3 px-6 text-sm font-medium text-gray-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
-                            {student.profilePicture ? (
-                              <img
-                                src={student.profilePicture}
-                                alt={student.fullName}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <UserIcon className="w-6 h-6 text-gray-600" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{student.fullName}</p>
-                            <p className="text-sm text-gray-500">{student.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-900">
-                        {student.courseOfStudy}
-                      </td>
-                      <td className="py-4 px-6 text-sm text-gray-900">
-                        {student.enrollmentYear}
-                      </td>
-                      <td className="py-4 px-6">
-                        <select
-                          value={student.status}
-                          onChange={(e) => handleStatusChange(student.id, e.target.value as Student['status'])}
-                          className={`text-xs font-medium px-2 py-1 rounded-full border-0 focus:ring-2 focus:ring-blue-500 ${getStatusColor(student.status)}`}
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Graduated">Graduated</option>
-                          <option value="Dropped">Dropped</option>
-                        </select>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-2">
-                          <Link
-                            href={`/students/${student.id}`}
-                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <EyeIcon className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDeleteStudent(student.id)}
-                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                            title="Delete Student"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
+              {loading ? (
+                <div className="flex justify-center items-center py-20">
+                    Loading...
+                </div>
+              ) : error ? (
+                <div className="text-center py-20 text-red-500">{error}</div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="text-left py-3 px-6">Student</th>
+                      <th className="text-left py-3 px-6">Course</th>
+                      <th className="text-left py-3 px-6">Year</th>
+                      <th className="text-left py-3 px-6">Status</th>
+                      <th className="text-left py-3 px-6">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredStudents.length > 0 ? (
+                      filteredStudents.map((student) => (
+                        <tr key={student.id} className="hover:bg-gray-50">
+                          <td className="py-4 px-6">
+                            <p className="font-medium">{student.fullName}</p>
+                            <p className="text-sm text-gray-500">{student.email}</p>
+                          </td>
+                          <td className="py-4 px-6">{student.course}</td>
+                          <td className="py-4 px-6">{student.enrollmentYear}</td>
+                          <td className="py-4 px-6">
+                            <select
+                              title={`Change status for ${student.fullName}`}
+                              value={student.status}
+                              onChange={(e) => handleStatusChange(student.id, e.target.value as DisplayStudent['status'])}
+                              className={`text-xs font-medium px-2 py-1 rounded-full border-0 ${getStatusColor(student.status)}`}
+                            >
+                              <option value="Active">Active</option>
+                              <option value="Graduated">Graduated</option>
+                              <option value="Dropped">Dropped</option>
+                            </select>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex items-center space-x-2">
+                              <Link href={`/students/${student.id}`} title="View Details">
+                                <EyeIcon className="w-4 h-4 text-blue-600"/>
+                              </Link>
+                              <button onClick={() => handleDeleteStudent(student.id)} title="Delete Student">
+                                <TrashIcon className="w-4 h-4 text-red-600"/>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                        <tr>
+                            <td colSpan={5} className="text-center py-12">
+                                <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-500">No students found for the current filters.</p>
+                            </td>
+                        </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
-
-            {filteredStudents.length === 0 && (
-              <div className="text-center py-12">
-                <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No students found</p>
-              </div>
-            )}
           </div>
         </div>
 
- 
+        
         {showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Student</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={newStudent.fullName}
-                    onChange={(e) => setNewStudent(prev => ({ ...prev, fullName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter student name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    value={newStudent.email}
-                    onChange={(e) => setNewStudent(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter email address"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={newStudent.phone}
-                    onChange={(e) => setNewStudent(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter phone number"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Course of Study *
-                  </label>
-                  <input
-                    type="text"
-                    value={newStudent.courseOfStudy}
-                    onChange={(e) => setNewStudent(prev => ({ ...prev, courseOfStudy: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Computer Science"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Expected Graduation Year
-                  </label>
-                  <select
-                    value={newStudent.enrollmentYear}
-                    onChange={(e) => setNewStudent(prev => ({ ...prev, enrollmentYear: parseInt(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {yearOptions.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddStudent}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Add Student
-                </button>
-              </div>
-            </div>
+             <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                 <h3 className="text-lg font-semibold mb-4">Add New Student</h3>
+                 <div className="space-y-4">
+                    <input
+                        type="text"
+                        value={newStudent.fullName}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, fullName: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                        placeholder="Full Name *"
+                    />
+                    <input
+                        type="email"
+                        value={newStudent.email}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, email: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                        placeholder="Email *"
+                    />
+                   
+                    <input
+                        type="password"
+                        value={newStudent.password}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                        placeholder="Password *"
+                        autoComplete="new-password"
+                    />
+                     <input
+                        type="tel"
+                        value={newStudent.phone}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, phone: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                        placeholder="Phone"
+                    />
+                    <input
+                        type="text"
+                        value={newStudent.course}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, courseOfStudy: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                        placeholder="Course of Study *"
+                    />
+                    <select
+                        title="Select enrollment year"
+                        value={newStudent.enrollmentYear}
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, enrollmentYear: parseInt(e.target.value) }))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                    >
+                        {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
+                    </select>
+                 </div>
+                 <div className="flex justify-end space-x-3 mt-6">
+                    <button onClick={() => setShowAddModal(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                    <button onClick={handleAddStudent} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Add Student</button>
+                 </div>
+             </div>
           </div>
         )}
       </Layout>
